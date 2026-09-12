@@ -104,6 +104,33 @@
             display: none;
             margin-top: 30px;
         }
+        
+        /* Filtre Butonları CSS (YENİ) */
+        .filter-group {
+            display: none; /* Başlangıçta gizli */
+            background: #e3e3e8;
+            padding: 4px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            justify-content: space-between;
+        }
+        .filter-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #1c1e21;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .filter-btn.active {
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -124,10 +151,20 @@
     </div>
 
     <h3 id="resultHeader">Seni Takip Etmeyenler (<span id="unfollowerCount">0</span>)</h3>
+    
+    <!-- Filtre Alanı (YENİ) -->
+    <div class="filter-group" id="filterGroup">
+        <button class="filter-btn active" data-filter="all">Tümü</button>
+        <button class="filter-btn" data-filter="unchecked">Bakılmayanlar</button>
+        <button class="filter-btn" data-filter="checked">Bakılanlar</button>
+    </div>
+
     <ul class="user-list" id="userList"></ul>
 </div>
 
 <script>
+    let currentFilter = 'all'; // Varsayılan filtre
+
     async function dosyaOku(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -153,11 +190,9 @@
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = content;
             
-            // Linklerin içinden sadece kullanıcı adını nokta atışı çıkar
             const links = tempDiv.querySelectorAll('a[href*="instagram.com"]');
             links.forEach(link => {
                 const url = link.href;
-                // Eğer linkte _u/ varsa bile temizleyip sadece saf kullanıcı adını alır
                 const match = url.match(/instagram\.com\/(?:_u\/)?([^/]+)/);
                 if (match && match[1]) {
                     usernames.add(match[1].trim());
@@ -167,12 +202,42 @@
         return usernames;
     }
 
+    // Filtreleri Uygulama Fonksiyonu (YENİ)
+    function filtreyiUygula() {
+        const items = document.querySelectorAll('.user-item');
+        items.forEach(item => {
+            const isChecked = item.classList.contains('checked');
+            
+            if (currentFilter === 'all') {
+                item.style.display = 'flex';
+            } else if (currentFilter === 'unchecked') {
+                item.style.display = isChecked ? 'none' : 'flex';
+            } else if (currentFilter === 'checked') {
+                item.style.display = isChecked ? 'flex' : 'none';
+            }
+        });
+    }
+
+    // Filtre Butonlarına Tıklama Olayları (YENİ)
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Aktif buton stilini değiştir
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Seçilen filtreyi güncelle ve uygula
+            currentFilter = this.getAttribute('data-filter');
+            filtreyiUygula();
+        });
+    });
+
     async function analiziBaslat() {
         const followersInput = document.getElementById('followersFile');
         const followingInput = document.getElementById('followingFile');
         const userList = document.getElementById('userList');
         const resultHeader = document.getElementById('resultHeader');
         const countSpan = document.getElementById('unfollowerCount');
+        const filterGroup = document.getElementById('filterGroup'); // YENİ
 
         if (!followersInput.files[0] || !followingInput.files[0]) {
             alert('Lütfen her iki dosyayı da seçin!');
@@ -180,6 +245,7 @@
         }
 
         userList.innerHTML = '<div style="text-align:center; padding: 20px;">Analiz ediliyor...</div>';
+        filterGroup.style.display = 'none'; // Analiz sırasında filtreyi gizle
 
         try {
             const followersData = await dosyaOku(followersInput.files[0]);
@@ -203,6 +269,9 @@
                 userList.innerHTML = '<div style="text-align:center; padding: 20px; font-weight:bold; color:#34c759;">Tebrikler! Takip ettiğin herkes seni takip ediyor.</div>';
                 return;
             }
+            
+            // Sonuçlar bulundu, filtreyi göster
+            filterGroup.style.display = 'flex';
 
             unfollowers.forEach(username => {
                 const li = document.createElement('li');
@@ -229,8 +298,15 @@
                     localStorage.setItem('checked_' + username, 'true');
                     listItem.classList.add('checked');
                     this.innerText = 'Bakıldı';
+                    
+                    // İşlem sonrası mevcut filtreyi tekrar uygula (YENİ)
+                    // (Örn: "Bakılmayanlar" filtresindeyken tıklarsan kişi otomatik gizlenir)
+                    filtreyiUygula();
                 });
             });
+            
+            // Başlangıçta seçili olan filtreyi uygula
+            filtreyiUygula();
 
         } catch (error) {
             alert('Dosyalar okunurken bir hata oluştu.');
